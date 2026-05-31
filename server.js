@@ -22,6 +22,10 @@ import {
   generateThumbnail,
 } from "./middleware/upload.js";
 
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
+
 dotenv.config();
 
 const app = express();

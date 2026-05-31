@@ -25,7 +25,7 @@ export const sendReplyEmail = async ({ toEmail, toName, replyMessage, originalMe
   const transporter = createTransporter();
 
   if (!transporter) {
-    console.log(`📨 Reply to ${toName} <${toEmail}>: ${replyMessage}`);
+    console.log(`Reply to ${toName} <${toEmail}>: ${replyMessage}`);
     return { success: true, simulated: true };
   }
 
@@ -60,10 +60,10 @@ export const sendReplyEmail = async ({ toEmail, toName, replyMessage, originalMe
       subject: `Re: Your inquiry - ${fromName}`,
       html,
     });
-    console.log(`✅ Email sent to ${toEmail}`);
+    console.log(`Email sent to ${toEmail}`);
     return { success: true };
   } catch (error) {
-    console.error('❌ Email send failed:', error.message);
+    console.error('Email send failed:', error.message);
     return { success: false, error: error.message };
   }
 };
