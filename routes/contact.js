@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Contact from '../models/Contact.js';
 import { protect, admin } from '../middleware/auth.js';
+import { sendReplyEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -245,22 +246,26 @@ router.post('/:id/reply', protect, admin, async (req, res) => {
       });
     }
 
+    // Send email
+    const emailResult = await sendReplyEmail({
+      toEmail: contact.email,
+      toName: contact.name,
+      replyMessage,
+      originalMessage: contact.message,
+    });
+
     // Update contact
     contact.status = 'replied';
     contact.repliedAt = new Date();
     
     // Add reply to admin notes
-    if (replyMessage) {
-      const replyNote = `\n[${new Date().toLocaleString()}] Reply sent: ${replyMessage}`;
-      contact.adminNotes = contact.adminNotes 
-        ? contact.adminNotes + replyNote
-        : replyNote;
-    }
+    const emailStatus = emailResult.success ? '✅ Email sent' : '⚠️ Email failed';
+    const replyNote = `\n[${new Date().toLocaleString()}] ${emailStatus}: ${replyMessage}`;
+    contact.adminNotes = contact.adminNotes 
+      ? contact.adminNotes + replyNote
+      : replyNote;
 
     await contact.save();
-
-    // Here you would integrate with your email service
-    console.log(`📨 Reply sent to ${contact.email}:`, replyMessage);
 
     res.json({
       success: true,

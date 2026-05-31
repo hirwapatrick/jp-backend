@@ -10,6 +10,7 @@ import contactRoutes from './routes/contact.js';
 import User from "./models/User.js";
 import Event from "./models/Event.js";
 import Media from "./models/Media.js";
+import Contact from "./models/Contact.js";
 
 // Import middleware
 import { protect, admin, editor } from "./middleware/auth.js";
@@ -269,6 +270,48 @@ app.put(
   },
 );
 
+// @route   PUT /api/auth/change-password
+// @access  Private
+app.put(
+  "/api/auth/change-password",
+  protect,
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.user._id).select("+password");
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res
+          .status(400)
+          .json({ message: "Current password and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ message: "New password must be at least 6 characters" });
+      }
+
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      user.password = newPassword;
+      await user.save();
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  },
+);
+
 // @route   POST /api/auth/register
 // @access  Private/Admin
 app.post("/api/auth/register", protect, admin, async (req, res) => {
@@ -405,10 +448,49 @@ app.get("/api/events/:id", async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    res.json(event);
+    // Sanitize password from public API response
+    const eventObj = event.toObject ? event.toObject() : { ...event };
+    if (eventObj.settings) {
+      eventObj.settings = {
+        ...eventObj.settings,
+        password: eventObj.settings.password ? true : false,
+      };
+    }
+
+    res.json(eventObj);
   } catch (error) {
     console.error("Get event error:", error);
     res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   POST /api/events/:id/verify-password
+// @access  Public
+app.post("/api/events/:id/verify-password", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid event ID format" });
+    }
+
+    const event = await Event.findById(req.params.id).select('settings eventName');
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ success: false, message: "Password is required" });
+    }
+
+    const isCorrect = event.settings?.password && event.settings.password === password;
+    if (!isCorrect) {
+      return res.status(401).json({ success: false, message: "Incorrect password" });
+    }
+
+    res.json({ success: true, message: "Password verified" });
+  } catch (error) {
+    console.error("Password verification error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -441,6 +523,7 @@ app.post(
         tags,
         status,
         featured,
+        settings,
       } = req.body;
 
       if (!eventName || !eventType || !location || !date) {
@@ -478,6 +561,21 @@ app.post(
         }
       }
 
+      // Parse settings
+      let parsedSettings = { allowDownloads: false, password: null, expiresAt: null };
+      if (settings) {
+        try {
+          const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          parsedSettings = {
+            allowDownloads: parsed.allowDownloads === true || parsed.allowDownloads === 'true',
+            password: parsed.password || null,
+            expiresAt: parsed.expiresAt || null,
+          };
+        } catch (e) {
+          console.error('Failed to parse settings:', e);
+        }
+      }
+
       const event = await Event.create({
         eventName,
         eventType,
@@ -489,6 +587,7 @@ app.post(
         tags: parsedTags,
         status: status || "draft",
         featured: featured === "true" || featured === true,
+        settings: parsedSettings,
         createdBy: req.user._id,
       });
 
@@ -551,15 +650,14 @@ app.put(
         tags,
         status,
         featured,
+        settings,
       } = req.body;
 
       // Handle cover image update
       if (req.file) {
-        // Delete old cover image
         if (event.coverImage?.publicId) {
           await deleteFromCloudinary(event.coverImage.publicId);
         }
-
         event.coverImage = {
           url: req.file.path,
           publicId: req.file.filename,
@@ -590,6 +688,20 @@ app.put(
       // Parse featured
       if (featured !== undefined) {
         event.featured = featured === "true" || featured === true;
+      }
+
+      // Parse settings
+      if (settings !== undefined) {
+        try {
+          const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          event.settings = {
+            allowDownloads: parsed.allowDownloads === true || parsed.allowDownloads === 'true',
+            password: parsed.password === '' ? event.settings?.password : (parsed.password || null),
+            expiresAt: parsed.expiresAt || null,
+          };
+        } catch (e) {
+          console.error('Failed to parse settings:', e);
+        }
       }
 
       const updatedEvent = await event.save();
@@ -1331,6 +1443,110 @@ app.get("/api/stats", protect, async (req, res) => {
     });
   } catch (error) {
     console.error("Stats error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/admin/events
+// @access  Private (Admin/Editor)
+// @desc    Get all events without status filtering (for admin dashboard)
+app.get("/api/admin/events", protect, editor, async (req, res) => {
+  try {
+    const { limit, status } = req.query;
+    const query = {};
+    if (status) query.status = status;
+
+    let eventsQuery = Event.find(query)
+      .populate({
+        path: 'media',
+        options: { sort: { order: 1, createdAt: 1 } }
+      })
+      .sort("-createdAt");
+
+    if (limit) {
+      eventsQuery = eventsQuery.limit(parseInt(limit));
+    }
+
+    const events = await eventsQuery;
+    res.json(events);
+  } catch (error) {
+    console.error("Admin events error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/dashboard
+// @access  Private
+// @desc    Get all dashboard data in a single endpoint
+app.get("/api/dashboard", protect, async (req, res) => {
+  try {
+    const [
+      totalEvents,
+      publishedEvents,
+      draftEvents,
+      featuredEvents,
+      totalMedia,
+      totalImages,
+      totalVideos,
+      totalUsers,
+      recentEvents,
+      recentMedia,
+      contactTotal,
+      contactNew,
+      contactRead,
+      contactReplied,
+    ] = await Promise.all([
+      Event.countDocuments(),
+      Event.countDocuments({ status: "published" }),
+      Event.countDocuments({ status: "draft" }),
+      Event.countDocuments({ featured: true }),
+      Media.countDocuments(),
+      Media.countDocuments({ type: "image" }),
+      Media.countDocuments({ type: "video" }),
+      User.countDocuments(),
+      Event.find()
+        .populate({
+          path: 'media',
+          options: { sort: { order: 1, createdAt: 1 } }
+        })
+        .sort("-createdAt")
+        .limit(5),
+      Media.find({})
+        .populate('event', 'eventName')
+        .sort('-createdAt')
+        .limit(10),
+      Contact.countDocuments(),
+      Contact.countDocuments({ status: 'new' }),
+      Contact.countDocuments({ status: 'read' }),
+      Contact.countDocuments({ status: 'replied' }),
+    ]);
+
+    res.json({
+      stats: {
+        events: {
+          total: totalEvents,
+          published: publishedEvents,
+          draft: draftEvents,
+          featured: featuredEvents,
+        },
+        media: {
+          total: totalMedia,
+          images: totalImages,
+          videos: totalVideos,
+        },
+        users: totalUsers,
+      },
+      recentEvents,
+      recentMedia,
+      contactStats: {
+        total: contactTotal,
+        new: contactNew,
+        read: contactRead,
+        replied: contactReplied,
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard error:", error);
     res.status(500).json({ message: error.message });
   }
 });
