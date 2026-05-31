@@ -16,23 +16,17 @@ const createTransporter = async () => {
   }
 
   const transporter = nodemailer.createTransport({
-    service: "gmail",
-
-    auth: {
-      user,
-      pass,
-    },
-
-    pool: true,
-
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user,
+    pass,
+  },
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
+});
 
   try {
     await transporter.verify();
