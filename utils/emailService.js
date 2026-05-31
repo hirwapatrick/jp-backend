@@ -1,44 +1,8 @@
-import nodemailer from "nodemailer";
-import dns from "dns";
+import { Resend } from "resend";
 
-// Force IPv4 first (helps on Render)
-dns.setDefaultResultOrder("ipv4first");
-
-const createTransporter = async () => {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!user || !pass) {
-    console.warn(
-      "⚠️ SMTP credentials missing. Emails will be logged to console."
-    );
-    return null;
-  }
-
-  const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user,
-    pass,
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-});
-
-  try {
-    await transporter.verify();
-    console.log("✅ SMTP Server Ready");
-  } catch (err) {
-    console.error("❌ SMTP Verify Failed:");
-    console.error(err);
-    return null;
-  }
-
-  return transporter;
-};
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 export const sendReplyEmail = async ({
   toEmail,
@@ -46,9 +10,7 @@ export const sendReplyEmail = async ({
   replyMessage,
   originalMessage,
 }) => {
-  const transporter = await createTransporter();
-
-  if (!transporter) {
+  if (!resend) {
     console.log(`
 ====================================================
 EMAIL SIMULATION
@@ -60,15 +22,15 @@ ${replyMessage}
     return {
       success: false,
       simulated: true,
-      error: "SMTP unavailable",
+      error: "Resend API key missing",
     };
   }
 
   const fromName =
-    process.env.SMTP_FROM_NAME || "Jacques Photography";
+    process.env.RESEND_FROM_NAME || "Jacques Photography";
 
   const fromEmail =
-    process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+    process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const html = `
     <div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -128,30 +90,36 @@ ${replyMessage}
   `;
 
   try {
-    const info = await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
-      to: `"${toName}" <${toEmail}>`,
+    const { data, error } = await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: [toEmail],
       subject: `Re: Your inquiry - ${fromName}`,
       html,
     });
 
-    console.log("✅ Email sent successfully");
-    console.log("Message ID:", info.messageId);
+    if (error) {
+      console.error("Email send failed");
+      console.error(error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    console.log("Email sent successfully");
+    console.log("Email ID:", data.id);
 
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data.id,
     };
   } catch (error) {
-    console.error("❌ Email send failed");
-    console.error("Code:", error.code);
-    console.error("Response:", error.response);
+    console.error("Email send failed");
     console.error("Message:", error.message);
 
     return {
       success: false,
       error: error.message,
-      code: error.code,
     };
   }
 };
