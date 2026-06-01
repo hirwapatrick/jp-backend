@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: photographer-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # ⚠️ Add your Render frontend URL below if the frontend is also on Render
+      # - key: FRONTEND_URL
+      #   value: https://your-frontend.onrender.com
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: FROM_NAME
+        sync: false

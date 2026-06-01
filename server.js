@@ -29,13 +29,18 @@ const app = express();
 // ============================================
 // CORS CONFIGURATION - FIXED
 // ============================================
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://jacques-photographer.vercel.app",
+];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "https://jacques-photographer.vercel.app",
-    ],
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
