@@ -1633,6 +1633,16 @@ app.post("/api/fix-event-media", protect, admin, async (req, res) => {
   }
 });
 
+// Root route — redirects browsers to API health
+app.get("/", (req, res) => {
+  res.json({
+    name: "Jacques Photography API",
+    version: "1.0.0",
+    status: "running",
+    docs: "/api/health",
+  });
+});
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
