@@ -1,8 +1,17 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+dotenv.config();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 export const sendReplyEmail = async ({
   toEmail,
@@ -10,10 +19,12 @@ export const sendReplyEmail = async ({
   replyMessage,
   originalMessage,
 }) => {
-  if (!resend) {
+  // Fallback simulation
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.log(`
 ====================================================
 EMAIL SIMULATION
+Reason: SMTP credentials missing
 To: ${toName} <${toEmail}>
 Message:
 ${replyMessage}
@@ -22,15 +33,12 @@ ${replyMessage}
     return {
       success: false,
       simulated: true,
-      error: "Resend API key missing",
+      error: "SMTP credentials missing",
     };
   }
 
-  const fromName =
-    process.env.RESEND_FROM_NAME || "Jacques Photography";
-
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const fromName = process.env.FROM_NAME || "Jacques Photography";
+  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
 
   const html = `
     <div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -54,20 +62,18 @@ ${replyMessage}
           originalMessage
             ? `
           <hr style="margin:25px 0;border:none;border-top:1px solid #ddd;" />
-          
+
           <p style="font-size:13px;color:#777;">
             <strong>Your original message:</strong>
           </p>
 
-          <blockquote
-            style="
-              margin:0;
-              padding:10px 15px;
-              border-left:4px solid #ddd;
-              color:#666;
-              background:#fff;
-            "
-          >
+          <blockquote style="
+            margin:0;
+            padding:10px 15px;
+            border-left:4px solid #ddd;
+            color:#666;
+            background:#fff;
+          ">
             ${originalMessage}
           </blockquote>
         `
@@ -90,32 +96,21 @@ ${replyMessage}
   `;
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: [toEmail],
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: toEmail,
       subject: `Re: Your inquiry - ${fromName}`,
       html,
     });
 
-    if (error) {
-      console.error("Email send failed");
-      console.error(error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    console.log("Email sent successfully");
-    console.log("Email ID:", data.id);
+    console.log("Email sent successfully:", info.messageId);
 
     return {
       success: true,
-      messageId: data.id,
+      messageId: info.messageId,
     };
   } catch (error) {
-    console.error("Email send failed");
-    console.error("Message:", error.message);
+    console.error("Email send failed:", error.message);
 
     return {
       success: false,

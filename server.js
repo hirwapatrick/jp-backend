@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary";
-import contactRoutes from './routes/contact.js';
+import contactRoutes from "./routes/contact.js";
 
 // Import models
 import User from "./models/User.js";
@@ -22,10 +22,6 @@ import {
   generateThumbnail,
 } from "./middleware/upload.js";
 
-import dns from 'dns';
-
-dns.setDefaultResultOrder('ipv4first');
-
 dotenv.config();
 
 const app = express();
@@ -33,17 +29,23 @@ const app = express();
 // ============================================
 // CORS CONFIGURATION - FIXED
 // ============================================
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://jacques-photographer.vercel.app'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://jacques-photographer.vercel.app",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/contact', contactRoutes);
+app.use("/api/contact", contactRoutes);
 
 // ============================================
 // CLOUDINARY CONFIG - FIXED
@@ -81,35 +83,37 @@ mongoose
 // Helper function to extract video info from URLs
 // Helper function to extract video info from URLs - FIXED VERSION
 const extractVideoInfo = (url) => {
-  let videoId = '';
-  let platform = '';
-  let thumbnail = '';
+  let videoId = "";
+  let platform = "";
+  let thumbnail = "";
 
   console.log("Extracting video info from:", url);
 
   // YouTube
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    platform = 'youtube';
-    
+  if (url.includes("youtube.com") || url.includes("youtu.be")) {
+    platform = "youtube";
+
     // youtube.com/watch?v=VIDEO_ID
-    if (url.includes('youtube.com/watch')) {
-      const urlParams = new URLSearchParams(url.split('?')[1]);
-      videoId = urlParams.get('v');
+    if (url.includes("youtube.com/watch")) {
+      const urlParams = new URLSearchParams(url.split("?")[1]);
+      videoId = urlParams.get("v");
     }
     // youtu.be/VIDEO_ID
-    else if (url.includes('youtu.be/')) {
-      videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    else if (url.includes("youtu.be/")) {
+      videoId = url.split("youtu.be/")[1]?.split("?")[0];
     }
-    
-    thumbnail = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : '';
+
+    thumbnail = videoId
+      ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+      : "";
   }
   // Vimeo
-  else if (url.includes('vimeo.com')) {
-    platform = 'vimeo';
+  else if (url.includes("vimeo.com")) {
+    platform = "vimeo";
     // Extract video ID from vimeo URL
     const matches = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
     videoId = matches ? matches[1] : null;
-    thumbnail = videoId ? `https://vumbnail.com/${videoId}.jpg` : '';
+    thumbnail = videoId ? `https://vumbnail.com/${videoId}.jpg` : "";
   }
 
   console.log("Extracted:", { videoId, platform, thumbnail });
@@ -122,10 +126,10 @@ const extractVideoInfo = (url) => {
 
 // Simple test route - NO AUTH REQUIRED
 app.get("/api/test", (req, res) => {
-  res.json({ 
-    success: true, 
-    message: "API is working!", 
-    timestamp: new Date().toISOString() 
+  res.json({
+    success: true,
+    message: "API is working!",
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -134,20 +138,22 @@ app.post("/api/test-upload", (req, res, next) => {
   upload.single("testImage")(req, res, (err) => {
     if (err) {
       console.error("Test upload error:", err);
-      return res.status(400).json({ 
-        success: false, 
-        error: err.message 
+      return res.status(400).json({
+        success: false,
+        error: err.message,
       });
     }
     res.json({
       success: true,
       message: "Test upload successful",
-      file: req.file ? {
-        path: req.file.path,
-        filename: req.file.filename,
-        public_id: req.file.filename,
-        url: req.file.path
-      } : null
+      file: req.file
+        ? {
+            path: req.file.path,
+            filename: req.file.filename,
+            public_id: req.file.filename,
+            url: req.file.path,
+          }
+        : null,
     });
   });
 });
@@ -276,45 +282,41 @@ app.put(
 
 // @route   PUT /api/auth/change-password
 // @access  Private
-app.put(
-  "/api/auth/change-password",
-  protect,
-  async (req, res) => {
-    try {
-      const user = await User.findById(req.user._id).select("+password");
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const { currentPassword, newPassword } = req.body;
-
-      if (!currentPassword || !newPassword) {
-        return res
-          .status(400)
-          .json({ message: "Current password and new password are required" });
-      }
-
-      if (newPassword.length < 6) {
-        return res
-          .status(400)
-          .json({ message: "New password must be at least 6 characters" });
-      }
-
-      const isMatch = await user.matchPassword(currentPassword);
-      if (!isMatch) {
-        return res.status(401).json({ message: "Current password is incorrect" });
-      }
-
-      user.password = newPassword;
-      await user.save();
-
-      res.json({ message: "Password updated successfully" });
-    } catch (error) {
-      console.error("Change password error:", error);
-      res.status(500).json({ message: error.message });
+app.put("/api/auth/change-password", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-  },
-);
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 6 characters" });
+    }
+
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // @route   POST /api/auth/register
 // @access  Private/Admin
@@ -408,8 +410,8 @@ app.get("/api/events", async (req, res) => {
 
     let eventsQuery = Event.find(query)
       .populate({
-        path: 'media',
-        options: { sort: { order: 1, createdAt: 1 } }
+        path: "media",
+        options: { sort: { order: 1, createdAt: 1 } },
       })
       .sort("-createdAt");
 
@@ -418,13 +420,15 @@ app.get("/api/events", async (req, res) => {
     }
 
     const events = await eventsQuery;
-    
+
     // Log for debugging
     console.log(`Found ${events.length} events`);
-    events.forEach(event => {
-      console.log(`Event: ${event.eventName}, Media count: ${event.media?.length || 0}`);
+    events.forEach((event) => {
+      console.log(
+        `Event: ${event.eventName}, Media count: ${event.media?.length || 0}`,
+      );
     });
-    
+
     res.json(events);
   } catch (error) {
     console.error("Get events error:", error);
@@ -438,9 +442,9 @@ app.get("/api/events/:id", async (req, res) => {
   try {
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid event ID format" 
+        message: "Invalid event ID format",
       });
     }
 
@@ -473,22 +477,33 @@ app.get("/api/events/:id", async (req, res) => {
 app.post("/api/events/:id/verify-password", async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ success: false, message: "Invalid event ID format" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid event ID format" });
     }
 
-    const event = await Event.findById(req.params.id).select('settings eventName');
+    const event = await Event.findById(req.params.id).select(
+      "settings eventName",
+    );
     if (!event) {
-      return res.status(404).json({ success: false, message: "Event not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
 
     const { password } = req.body;
     if (!password) {
-      return res.status(400).json({ success: false, message: "Password is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Password is required" });
     }
 
-    const isCorrect = event.settings?.password && event.settings.password === password;
+    const isCorrect =
+      event.settings?.password && event.settings.password === password;
     if (!isCorrect) {
-      return res.status(401).json({ success: false, message: "Incorrect password" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect password" });
     }
 
     res.json({ success: true, message: "Password verified" });
@@ -531,11 +546,9 @@ app.post(
       } = req.body;
 
       if (!eventName || !eventType || !location || !date) {
-        return res
-          .status(400)
-          .json({
-            message: "Please provide event name, type, location, and date",
-          });
+        return res.status(400).json({
+          message: "Please provide event name, type, location, and date",
+        });
       }
 
       // Handle cover image
@@ -566,17 +579,24 @@ app.post(
       }
 
       // Parse settings
-      let parsedSettings = { allowDownloads: false, password: null, expiresAt: null };
+      let parsedSettings = {
+        allowDownloads: false,
+        password: null,
+        expiresAt: null,
+      };
       if (settings) {
         try {
-          const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          const parsed =
+            typeof settings === "string" ? JSON.parse(settings) : settings;
           parsedSettings = {
-            allowDownloads: parsed.allowDownloads === true || parsed.allowDownloads === 'true',
+            allowDownloads:
+              parsed.allowDownloads === true ||
+              parsed.allowDownloads === "true",
             password: parsed.password || null,
             expiresAt: parsed.expiresAt || null,
           };
         } catch (e) {
-          console.error('Failed to parse settings:', e);
+          console.error("Failed to parse settings:", e);
         }
       }
 
@@ -622,9 +642,9 @@ app.put(
     try {
       // Validate ObjectId
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Invalid event ID format" 
+          message: "Invalid event ID format",
         });
       }
 
@@ -697,14 +717,20 @@ app.put(
       // Parse settings
       if (settings !== undefined) {
         try {
-          const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+          const parsed =
+            typeof settings === "string" ? JSON.parse(settings) : settings;
           event.settings = {
-            allowDownloads: parsed.allowDownloads === true || parsed.allowDownloads === 'true',
-            password: parsed.password === '' ? event.settings?.password : (parsed.password || null),
+            allowDownloads:
+              parsed.allowDownloads === true ||
+              parsed.allowDownloads === "true",
+            password:
+              parsed.password === ""
+                ? event.settings?.password
+                : parsed.password || null,
             expiresAt: parsed.expiresAt || null,
           };
         } catch (e) {
-          console.error('Failed to parse settings:', e);
+          console.error("Failed to parse settings:", e);
         }
       }
 
@@ -723,9 +749,9 @@ app.delete("/api/events/:id", protect, editor, async (req, res) => {
   try {
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid event ID format" 
+        message: "Invalid event ID format",
       });
     }
 
@@ -787,9 +813,9 @@ app.patch("/api/events/:id/featured", protect, editor, async (req, res) => {
   try {
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid event ID format" 
+        message: "Invalid event ID format",
       });
     }
 
@@ -825,39 +851,44 @@ app.post(
   editor,
   (req, res, next) => {
     console.log("📸 Image upload request received");
-    console.log("Headers:", req.headers['content-type']);
+    console.log("Headers:", req.headers["content-type"]);
     console.log("Body keys:", Object.keys(req.body));
-    
+
     upload.single("image")(req, res, (err) => {
       if (err) {
         console.error("❌ Image upload error details:", {
           message: err.message,
           code: err.code,
-          stack: err.stack
+          stack: err.stack,
         });
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           message: err.message,
-          error: err.code || 'UPLOAD_ERROR'
+          error: err.code || "UPLOAD_ERROR",
         });
       }
-      
-      console.log("✅ File received:", req.file ? {
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-        path: req.file.path
-      } : 'No file');
-      
+
+      console.log(
+        "✅ File received:",
+        req.file
+          ? {
+              filename: req.file.filename,
+              size: req.file.size,
+              mimetype: req.file.mimetype,
+              path: req.file.path,
+            }
+          : "No file",
+      );
+
       next();
     });
   },
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "No image uploaded" 
+          message: "No image uploaded",
         });
       }
 
@@ -869,15 +900,15 @@ app.post(
         url: req.file.path,
         publicId: req.file.filename,
         thumbnail: thumbnailUrl,
-        format: req.file.format || 'jpg',
+        format: req.file.format || "jpg",
         width: req.file.width || 0,
         height: req.file.height || 0,
       });
     } catch (error) {
       console.error("Image upload processing error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
-        message: error.message 
+        message: error.message,
       });
     }
   },
@@ -888,15 +919,17 @@ app.post(
 app.post("/api/media/delete-upload", protect, editor, async (req, res) => {
   try {
     const { publicId, type } = req.body;
-    
+
     if (!publicId) {
       return res.status(400).json({ message: "Public ID is required" });
     }
 
-    console.log(`🗑️ Deleting orphaned upload: ${publicId} (${type || 'image'})`);
-    
-    await deleteFromCloudinary(publicId, type || 'image');
-    
+    console.log(
+      `🗑️ Deleting orphaned upload: ${publicId} (${type || "image"})`,
+    );
+
+    await deleteFromCloudinary(publicId, type || "image");
+
     res.json({ success: true, message: "File deleted successfully" });
   } catch (error) {
     console.error("Error deleting orphaned upload:", error);
@@ -911,21 +944,21 @@ app.post("/api/media/delete-upload", protect, editor, async (req, res) => {
 app.post("/api/media/video-link", protect, editor, async (req, res) => {
   try {
     console.log("🎥 Video link request received:", req.body);
-    
+
     const { eventId, url, title, description, featured } = req.body;
 
     if (!eventId || !url) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Please provide eventId and url" 
+        message: "Please provide eventId and url",
       });
     }
 
     // Validate eventId format
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid event ID format" 
+        message: "Invalid event ID format",
       });
     }
 
@@ -933,17 +966,17 @@ app.post("/api/media/video-link", protect, editor, async (req, res) => {
     try {
       new URL(url);
     } catch (err) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid URL format" 
+        message: "Invalid URL format",
       });
     }
 
     const event = await Event.findById(eventId);
     if (!event) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Event not found" 
+        message: "Event not found",
       });
     }
 
@@ -954,63 +987,66 @@ app.post("/api/media/video-link", protect, editor, async (req, res) => {
 
     // Extract video info
     const { videoId, platform, thumbnail } = extractVideoInfo(url);
-    
+
     console.log("Video info extracted:", { videoId, platform, thumbnail });
 
     if (!videoId || !platform) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid video URL. Only YouTube and Vimeo links are supported." 
+        message:
+          "Invalid video URL. Only YouTube and Vimeo links are supported.",
       });
     }
 
     // Create media entry
     const media = await Media.create({
       event: eventId,
-      type: 'video',
+      type: "video",
       platform,
       videoId,
       url,
       publicId: `${platform}_${videoId}`,
       thumbnail: {
         url: thumbnail,
-        publicId: `${platform}_${videoId}_thumb`
+        publicId: `${platform}_${videoId}_thumb`,
       },
-      title: title || `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
-      description: description || '',
+      title:
+        title ||
+        `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
+      description: description || "",
       format: platform,
       featured: featured || false,
       order: 0,
-      uploadedBy: req.user._id
+      uploadedBy: req.user._id,
     });
 
     // Add to event's media array
     event.media.push(media._id);
-    
+
     // Update media stats
     if (!event.mediaStats) {
       event.mediaStats = { images: 0, videos: 0, total: 0 };
     }
     event.mediaStats.videos = (event.mediaStats.videos || 0) + 1;
     event.mediaStats.total = (event.mediaStats.total || 0) + 1;
-    
+
     await event.save();
 
     console.log("✅ Video link added successfully:", media._id);
     res.status(201).json({
       success: true,
-      data: media
+      data: media,
     });
   } catch (error) {
     console.error("❌ Add video link error:", {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
     });
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: error.message,
-      error: error.name
+      error: error.name,
     });
   }
 });
@@ -1044,7 +1080,7 @@ app.post(
           url: file.path,
           publicId: file.filename,
           thumbnail: thumbnailUrl,
-          format: file.format || 'jpg',
+          format: file.format || "jpg",
           width: file.width || 0,
           height: file.height || 0,
         });
@@ -1059,7 +1095,7 @@ app.post(
       console.error("Multiple upload error:", error);
       res.status(500).json({ message: error.message });
     }
-  }
+  },
 );
 
 // @route   GET /api/media/recent
@@ -1069,10 +1105,10 @@ app.get("/api/media/recent", protect, async (req, res) => {
   try {
     const { limit = 10 } = req.query;
     const media = await Media.find({})
-      .populate('event', 'eventName')
-      .sort('-createdAt')
+      .populate("event", "eventName")
+      .sort("-createdAt")
       .limit(parseInt(limit));
-    
+
     res.json(media);
   } catch (error) {
     console.error("Get recent media error:", error);
@@ -1087,9 +1123,9 @@ app.get("/api/media/event/:eventId", async (req, res) => {
   try {
     // Validate eventId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.eventId)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid event ID format" 
+        message: "Invalid event ID format",
       });
     }
 
@@ -1138,7 +1174,9 @@ app.post("/api/media/video-link", protect, editor, async (req, res) => {
     const { eventId, url, title, description, featured } = req.body;
 
     if (!eventId || !url) {
-      return res.status(400).json({ message: "Please provide eventId and url" });
+      return res
+        .status(400)
+        .json({ message: "Please provide eventId and url" });
     }
 
     // Validate URL
@@ -1157,29 +1195,32 @@ app.post("/api/media/video-link", protect, editor, async (req, res) => {
     const { videoId, platform, thumbnail } = extractVideoInfo(url);
 
     if (!videoId || !platform) {
-      return res.status(400).json({ 
-        message: "Invalid video URL. Only YouTube and Vimeo links are supported." 
+      return res.status(400).json({
+        message:
+          "Invalid video URL. Only YouTube and Vimeo links are supported.",
       });
     }
 
     // Create media entry
     const media = await Media.create({
       event: eventId,
-      type: 'video',
+      type: "video",
       platform,
       videoId,
       url,
       publicId: `${platform}_${videoId}`,
       thumbnail: {
         url: thumbnail,
-        publicId: `${platform}_${videoId}_thumb`
+        publicId: `${platform}_${videoId}_thumb`,
       },
-      title: title || `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
-      description: description || '',
+      title:
+        title ||
+        `${platform.charAt(0).toUpperCase() + platform.slice(1)} Video`,
+      description: description || "",
       format: platform,
       featured: featured || false,
       order: 0,
-      uploadedBy: req.user._id
+      uploadedBy: req.user._id,
     });
 
     // Add to event's media array
@@ -1199,16 +1240,16 @@ app.post("/api/media/video-link", protect, editor, async (req, res) => {
 app.get("/api/media/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if it's a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: "Invalid media ID format",
-        error: "The provided ID is not a valid MongoDB ObjectId"
+        error: "The provided ID is not a valid MongoDB ObjectId",
       });
     }
-    
+
     const media = await Media.findById(id).populate("event", "eventName");
 
     if (!media) {
@@ -1342,9 +1383,9 @@ app.put("/api/media/:id", protect, editor, async (req, res) => {
   try {
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid media ID format" 
+        message: "Invalid media ID format",
       });
     }
 
@@ -1376,9 +1417,9 @@ app.delete("/api/media/:id", protect, editor, async (req, res) => {
   try {
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid media ID format" 
+        message: "Invalid media ID format",
       });
     }
 
@@ -1462,8 +1503,8 @@ app.get("/api/admin/events", protect, editor, async (req, res) => {
 
     let eventsQuery = Event.find(query)
       .populate({
-        path: 'media',
-        options: { sort: { order: 1, createdAt: 1 } }
+        path: "media",
+        options: { sort: { order: 1, createdAt: 1 } },
       })
       .sort("-createdAt");
 
@@ -1510,19 +1551,19 @@ app.get("/api/dashboard", protect, async (req, res) => {
       User.countDocuments(),
       Event.find()
         .populate({
-          path: 'media',
-          options: { sort: { order: 1, createdAt: 1 } }
+          path: "media",
+          options: { sort: { order: 1, createdAt: 1 } },
         })
         .sort("-createdAt")
         .limit(5),
       Media.find({})
-        .populate('event', 'eventName')
-        .sort('-createdAt')
+        .populate("event", "eventName")
+        .sort("-createdAt")
         .limit(10),
       Contact.countDocuments(),
-      Contact.countDocuments({ status: 'new' }),
-      Contact.countDocuments({ status: 'read' }),
-      Contact.countDocuments({ status: 'replied' }),
+      Contact.countDocuments({ status: "new" }),
+      Contact.countDocuments({ status: "read" }),
+      Contact.countDocuments({ status: "replied" }),
     ]);
 
     res.json({
@@ -1555,33 +1596,32 @@ app.get("/api/dashboard", protect, async (req, res) => {
   }
 });
 
-
 // Add this temporary route to fix existing events
 app.post("/api/fix-event-media", protect, admin, async (req, res) => {
   try {
     const { eventId } = req.body;
-    
+
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
-    
+
     // Initialize media array if it doesn't exist
     if (!event.media) {
       event.media = [];
     }
-    
+
     // Initialize mediaStats if it doesn't exist
     if (!event.mediaStats) {
       event.mediaStats = { images: 0, videos: 0, total: 0 };
     }
-    
+
     await event.save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Event fixed successfully",
-      event 
+      event,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1597,7 +1637,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-
 // ============================================
 // ERROR HANDLING
 // ============================================
@@ -1608,10 +1647,12 @@ app.use(errorHandler);
 // START SERVER
 // ============================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on:`);
   console.log(`   - Local: http://localhost:${PORT}`);
   console.log(`   - Network: http://0.0.0.0:${PORT}`);
-  console.log(`📸 Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME ? "Configured" : "Missing config"}`);
+  console.log(
+    `📸 Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME ? "Configured" : "Missing config"}`,
+  );
   console.log(`🔧 Test endpoint: http://localhost:${PORT}/api/test`);
 });
