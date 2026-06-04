@@ -511,7 +511,13 @@ app.post("/api/events/:id/verify-password", async (req, res) => {
         .json({ success: false, message: "Incorrect password" });
     }
 
-    res.json({ success: true, message: "Password verified" });
+    const token = jwt.sign(
+      { eventId: event._id.toString(), type: "event-access" },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" },
+    );
+
+    res.json({ success: true, message: "Password verified", token });
   } catch (error) {
     console.error("Password verification error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1122,7 +1128,7 @@ app.get("/api/media/recent", protect, async (req, res) => {
 });
 
 // @route   GET /api/media/event/:eventId
-// @access  Public
+// @access  Public (limited to 5 unless password-verified)
 // ⚠️ THIS MUST COME BEFORE /api/media/:id
 app.get("/api/media/event/:eventId", async (req, res) => {
   try {
@@ -1134,10 +1140,54 @@ app.get("/api/media/event/:eventId", async (req, res) => {
       });
     }
 
-    const media = await Media.find({ event: req.params.eventId }).sort(
-      "order createdAt",
-    );
-    res.json(media);
+    const event = await Event.findById(req.params.eventId).select("settings");
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    const total = await Media.countDocuments({ event: req.params.eventId });
+
+    // If event has no password, return all media
+    if (!event.settings?.password) {
+      const media = await Media.find({ event: req.params.eventId }).sort(
+        "order createdAt",
+      );
+      return res.json({ media, total });
+    }
+
+    // Check for verification token
+    let isVerified = false;
+    const authHeader = req.headers.authorization;
+    const queryToken = req.query.token;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : queryToken;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (
+          decoded.eventId === req.params.eventId &&
+          decoded.type === "event-access"
+        ) {
+          isVerified = true;
+        }
+      } catch {
+        // Token invalid — fall through to limited response
+      }
+    }
+
+    if (isVerified) {
+      const media = await Media.find({ event: req.params.eventId }).sort(
+        "order createdAt",
+      );
+      res.json({ media, total });
+    } else {
+      const media = await Media.find({ event: req.params.eventId })
+        .sort("order createdAt")
+        .limit(5);
+      res.json({ media, total });
+    }
   } catch (error) {
     console.error("Get media error:", error);
     res.status(500).json({ message: error.message });
