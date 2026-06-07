@@ -5,11 +5,14 @@ import cors from "cors";
 import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary";
 import contactRoutes from "./routes/contact.js";
+import tutorialRoutes from "./routes/tutorials.js";
+import commentRoutes from "./routes/comments.js";
 
 // Import models
 import User from "./models/User.js";
 import Event from "./models/Event.js";
 import Media from "./models/Media.js";
+import Tutorial from "./models/Tutorial.js";
 import Contact from "./models/Contact.js";
 
 // Import middleware
@@ -51,6 +54,8 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/contact", contactRoutes);
+app.use("/api/tutorials", tutorialRoutes);
+app.use("/api/comments", commentRoutes);
 
 // ============================================
 // CLOUDINARY CONFIG - FIXED
@@ -1526,6 +1531,8 @@ app.get("/api/stats", protect, async (req, res) => {
     const totalImages = await Media.countDocuments({ type: "image" });
     const totalVideos = await Media.countDocuments({ type: "video" });
     const totalUsers = await User.countDocuments();
+    const totalTutorials = await Tutorial.countDocuments();
+    const publishedTutorials = await Tutorial.countDocuments({ status: "published" });
 
     res.json({
       events: {
@@ -1540,6 +1547,10 @@ app.get("/api/stats", protect, async (req, res) => {
         videos: totalVideos,
       },
       users: totalUsers,
+      tutorials: {
+        total: totalTutorials,
+        published: publishedTutorials,
+      },
     });
   } catch (error) {
     console.error("Stats error:", error);
@@ -1595,6 +1606,8 @@ app.get("/api/dashboard", protect, async (req, res) => {
       contactNew,
       contactRead,
       contactReplied,
+      totalTutorials,
+      publishedTutorials,
     ] = await Promise.all([
       Event.countDocuments(),
       Event.countDocuments({ status: "published" }),
@@ -1619,6 +1632,8 @@ app.get("/api/dashboard", protect, async (req, res) => {
       Contact.countDocuments({ status: "new" }),
       Contact.countDocuments({ status: "read" }),
       Contact.countDocuments({ status: "replied" }),
+      Tutorial.countDocuments(),
+      Tutorial.countDocuments({ status: "published" }),
     ]);
 
     res.json({
@@ -1635,6 +1650,10 @@ app.get("/api/dashboard", protect, async (req, res) => {
           videos: totalVideos,
         },
         users: totalUsers,
+        tutorials: {
+          total: totalTutorials,
+          published: publishedTutorials,
+        },
       },
       recentEvents,
       recentMedia,
