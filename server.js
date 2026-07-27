@@ -188,7 +188,6 @@ app.get("/api/cloudinary-test", (req, res) => {
 // ============================================
 // AUTHENTICATION ROUTES
 // ============================================
-
 // @route   POST /api/auth/login
 // @access  Public
 app.post("/api/auth/login", async (req, res) => {
